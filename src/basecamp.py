@@ -78,6 +78,39 @@ class Basecamp(object):
             path = 'people/%d.xml' % person_id
         response = ET.fromstring(self._request(path))
         return Person(self, response)
+    
+    def get_companies(self, project_id=None):
+        path = ''
+        if project_id is None:
+            path = 'companies.xml'
+        else:
+            path = 'projects/%d/companies.xml' % project_id
+        response = ET.fromstring(self._request(path))
+        companies = []
+        for i in response.findall("company"):
+            c = Company(self, i)
+            companies.append(c)
+        return companies
+    
+    def get_company(self, company_id):
+        path = 'companies/%d.xml' % company_id 
+        response = ET.fromstring(self._request(path))
+        return Company(self, response)
+    
+    def get_project(self, project_id):
+        path = 'projects/%u.xml' % project_id
+        response = ET.fromstring(self._request(path))
+        return TodoList(self, response)
+    
+    def get_projects(self):
+        path = 'projects.xml'
+        response = ET.fromstring(self._request(path))
+        #print ET.tostring(response)
+        projects = []
+        for i in response.findall("project"):
+            p = Project(self, i)
+            projects.append(p)
+        return projects
 
 class BasecampObject(object):
     def __init__(self, basecamp):
@@ -100,10 +133,13 @@ class BasecampObject(object):
             elif attr_type == "datetime":
                 return datetime.datetime.strptime(
                     i.text, '%Y-%m-%dT%H:%M:%SZ')
+            elif attr_type == "date":
+                return datetime.datetime.strptime(
+                    i.text, '%Y-%m-%d')
             elif attr_type == "boolean":
                 return (i.text == "true")
             else:
-                raise UnknownAttributeType() 
+                raise UnknownAttributeType(attr_type) 
         return None
         
 class TodoList(BasecampObject):
@@ -150,7 +186,7 @@ class TodoItem(BasecampObject):
         
     def fromXml(self, et):
         # iterate over the todo-item attributes
-        print ET.tostring(et)
+        #print ET.tostring(et)
         for i in et.iter():
             # [see the comment in TodoList::fromXml!]
             if i.tag == 'todo-item':
@@ -191,3 +227,39 @@ class Person(BasecampObject):
             
     def __repr__(self):
         return 'Person: %s, %s (%d)' % (self.last_name, self.first_name, self.id)
+
+class Company(BasecampObject):
+    def __init__(self, basecamp, et=None):
+        super(Company, self).__init__(basecamp)
+        if not(et is None):
+            self.fromXml(et)
+        
+    def fromXml(self, et):
+        # iterate over the project attributes
+        for i in et.iter():
+            # make sure the variable names do not contain a dash
+            tag = i.tag.replace('-', '_')
+            self.__dict__[tag] = self.xmlAttr2Attr(i)
+            
+    def __repr__(self):
+        return 'Company: %s (%d)' % (self.name, self.id)
+
+class Project(BasecampObject):
+    def __init__(self, basecamp, et=None):
+        super(Project, self).__init__(basecamp)
+        if not(et is None):
+            self.fromXml(et)
+        
+    def fromXml(self, et):
+        # find, read and remove the company info
+        et_company = et.find("company")
+        self.__dict__['company'] = Company(et_company)
+        et.remove(et_company)
+        # iterate over the project attributes
+        for i in et.iter():
+            # make sure the variable names do not contain a dash
+            tag = i.tag.replace('-', '_')
+            self.__dict__[tag] = self.xmlAttr2Attr(i)
+            
+    def __repr__(self):
+        return 'Project: %s (%d)' % (self.name, self.id)
