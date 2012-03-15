@@ -1,5 +1,24 @@
 '''
     BaseCamp API for Python 2.7
+    Copyright (C) 2012 Marc Kirchner
+    
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 '''
 
 import urllib2
@@ -55,6 +74,7 @@ class Basecamp(object):
     def get_todo_list(self, list_id):
         path = 'todo_lists/%u.xml' % list_id
         response = ET.fromstring(self._request(path))
+        #print ET.tostring(response)
         return TodoList(self, response)
     
     def get_todo_lists(self, responsible_party=None):
@@ -78,6 +98,15 @@ class Basecamp(object):
             path = 'people/%d.xml' % person_id
         response = ET.fromstring(self._request(path))
         return Person(self, response)
+    
+    def get_people(self):
+        path = 'people.xml'
+        response = ET.fromstring(self._request(path))
+        people = []
+        for i in response.findall("person"):
+            p = Person(self, i)
+            people.append(p)
+        return people
     
     def get_companies(self, project_id=None):
         path = ''
@@ -175,7 +204,7 @@ class TodoList(BasecampObject):
             
     def __str__(self):
         return "[%d] Todo list: %s (%d items)" % (
-            self.id, self.name, len(self.todo_items, []))
+            self.id, self.name, len(self.todo_items))
         #return str(self.__dict__)
 
 class TodoItem(BasecampObject):
@@ -219,7 +248,6 @@ class Person(BasecampObject):
             self.fromXml(et)
         
     def fromXml(self, et):
-        # iterate over the todo-item attributes
         for i in et.iter():
             # make sure the variable names do not contain a dash
             tag = i.tag.replace('-', '_')
@@ -235,7 +263,7 @@ class Company(BasecampObject):
             self.fromXml(et)
         
     def fromXml(self, et):
-        # iterate over the project attributes
+        # iterate over the company attributes
         for i in et.iter():
             # make sure the variable names do not contain a dash
             tag = i.tag.replace('-', '_')
@@ -243,6 +271,16 @@ class Company(BasecampObject):
             
     def __repr__(self):
         return 'Company: %s (%d)' % (self.name, self.id)
+
+    def get_people(self):
+        path = 'companies/%d/people.xml' % self.id
+        response = ET.fromstring(self.bc_handle._request(path))
+        self.people = []
+        for i in response.findall("person"):
+            p = Person(self.bc_handle, i)
+            self.people.append(p)
+        return self.people
+
 
 class Project(BasecampObject):
     def __init__(self, basecamp, et=None):
@@ -263,3 +301,23 @@ class Project(BasecampObject):
             
     def __repr__(self):
         return 'Project: %s (%d)' % (self.name, self.id)
+    
+    def get_companies(self):
+        path = 'projects/%d/companies.xml' % self.id
+        response = ET.fromstring(self.bc_handle._request(path))
+        self.companies = []
+        for i in response.findall("company"):
+            c = Company(self.bc_handle, i)
+            self.companies.append(c)
+        return self.companies
+    
+    def get_people(self):
+        path = 'projects/%d/people.xml' % self.id
+        response = ET.fromstring(self.bc_handle._request(path))
+        self.people = []
+        for i in response.findall("person"):
+            p = Person(self.bc_handle, i)
+            self.people.append(p)
+        return self.people
+    
+    #def get_projects(self):
